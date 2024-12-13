@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>จัดการสมาชิก</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- รวม Tailwind CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+  <!-- รวม SweetAlert -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+    .bg-main {
+      background-color: #181059;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 container mx-auto  p-8">
+
+  <div class="flex">
+    <!-- Sidebar -->
+    <div class="w-1/4 mr-2">
+       <!-- ฟอร์มเพิ่มสมาชิกใหม่ -->
+      <div class="bg-white p-6 border border-indigo-900 rounded shadow-md">
+        <h3 class="text-xl font-semibold mb-4">เพิ่มสมาชิกใหม่</h3>
+        <form id="addMemberForm">
+          <div class="grid grid-cols-1 gap-6">
+            <div>
+              <label for="userID" class="block text-gray-700">UserID:</label>
+              <input type="text" id="userID" name="userID" class="mt-1 p-2 w-full bg-main text-white border rounded" placeholder="LineOA ID">
+            </div>
+            <div>
+              <label for="employeeName" class="block text-gray-700">ชื่อพนักงาน:</label>
+              <input type="text" id="employeeName" name="employeeName" required class="mt-1 p-2 w-full border rounded">
+            </div>
+            <div>
+              <label for="phoneNumber" class="block text-gray-700">เบอร์โทร:</label>
+              <input type="text" id="phoneNumber" name="phoneNumber" required class="mt-1 p-2 w-full border rounded">
+            </div>
+            <div>
+              <label for="acceptRecord" class="block text-gray-700">ยอมรับบันทึก:</label>
+              <select id="acceptRecord" name="acceptRecord" required class="mt-1 p-2 w-full border rounded">
+                <option value="TRUE">TRUE</option>
+                <option value="FALSE">FALSE</option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-4">
+            <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">เพิ่มสมาชิก</button>
+          </div>
+        </form>
+      </div>
+    
+    </div>
+
+    <!-- Main Content -->
+    <div class="w-3/4 ">
+      <!-- ตารางแสดงข้อมูลสมาชิก -->
+      <div class="bg-white p-6 rounded shadow-md">
+        <h3 class="text-xl font-semibold mb-4">ข้อมูลสมาชิกปัจจุบัน</h3>
+        <table class="min-w-full text-sm divide-y divide-gray-200" id="membersTable">
+          <thead>
+            <tr>
+              <th class="px-6 py-3 bg-main text-left text-sm font-medium text-white uppercase tracking-wider rounded-tl-lg">IDKey</th>
+              <th class="px-6 py-3 bg-main text-left text-sm font-medium text-white uppercase tracking-wider">UserID</th>
+              <th class="px-6 py-3 bg-main text-left text-sm font-medium text-white uppercase tracking-wider">ชื่อพนักงาน</th>
+              <th class="px-6 py-3 bg-main text-left text-sm font-medium text-white uppercase tracking-wider">เบอร์โทร</th>
+              <th class="px-6 py-3 bg-main text-left text-sm font-medium text-white uppercase tracking-wider">ยอมรับบันทึก</th>
+              <th class="px-6 py-3 bg-main text-left text-sm font-medium text-white uppercase tracking-wider">Timestamp</th>
+              <th class="px-6 py-3 bg-main text-center text-sm font-medium text-white uppercase tracking-wider rounded-tr-lg">การกระทำ</th>
+            </tr>
+          </thead>
+          <tbody id="membersTableBody" class="bg-white text-sm divide-y divide-gray-200">
+            <!-- ข้อมูลจะถูกเติมโดย JavaScript -->
+          </tbody>
+        </table>
+        <!-- ปุ่มอัพเดททั้งหมด -->
+        <div class="mt-4 text-right">
+          <button onclick="updateAllMembers()" class="bg-main text-white px-4 py-2 rounded">อัพเดททั้งหมด</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let membersData = []; // เก็บข้อมูลทั้งหมดจากชีตสมาชิก
+
+    document.addEventListener('DOMContentLoaded', function() {
+      fetchMembers();
+
+      const addMemberForm = document.getElementById('addMemberForm');
+      addMemberForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        addMember();
+      });
+    });
+
+    // ดึงข้อมูลจากชีตสมาชิก
+    function fetchMembers() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          membersData = data; // เก็บข้อมูลในตัวแปร membersData
+          populateMembersTable(data);
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error fetching members:', error);
+          Swal.fire({
+            icon: 'error',
+            title: 'เกิดข้อผิดพลาด',
+            text: 'ไม่สามารถดึงข้อมูลสมาชิกได้'
+          });
+        })
+        .getMembers();
+    }
+
+    // แสดงข้อมูลในตาราง
+    function populateMembersTable(data) {
+      const tableBody = document.getElementById('membersTableBody');
+      tableBody.innerHTML = '';
+
+      data.forEach((row) => {
+        // ตรวจสอบว่า UserID มีค่าหรือไม่
+        const userIDLink = row.UserID 
+          ? `<a href="https://line.me/R/ti/p/${encodeURIComponent(row.UserID)}" target="_blank" class="text-blue-500 underline">เชื่อมต่อ LineOA</a>` 
+          : '';
+
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap">
+            ${row.idkey}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            ${userIDLink}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span contenteditable="true" class="block focus:outline-none" data-key="${row.idkey}" data-field="ชื่อพนักงาน">${row.ชื่อพนักงาน}</span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span contenteditable="true" class="block focus:outline-none" data-key="${row.idkey}" data-field="เบอร์โทร">${row.เบอร์โทร}</span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span contenteditable="true" class="block focus:outline-none" data-key="${row.idkey}" data-field="ยอมรับบันทึก">${row.ยอมรับบันทึก}</span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            ${row.Timestamp}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-center">
+            <button onclick="deleteMember('${row.idkey}')" class="bg-red-500 text-white px-2 py-1 rounded">ลบ</button>
+          </td>
+        `;
+
+        tableBody.appendChild(tr);
+      });
+    }
+
+    // ฟังก์ชันเพิ่มสมาชิกใหม่
+    function addMember() {
+      const userID = document.getElementById('userID').value;
+      const employeeName = document.getElementById('employeeName').value;
+      const phoneNumber = document.getElementById('phoneNumber').value;
+      const acceptRecord = document.getElementById('acceptRecord').value;
+
+      const newMember = {
+        UserID: userID,
+        ชื่อพนักงาน: employeeName,
+        เบอร์โทร: phoneNumber,
+        ยอมรับบันทึก: acceptRecord
+      };
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          Swal.fire({
+            icon: 'success',
+            title: 'สำเร็จ!',
+            text: response
+          });
+          document.getElementById('addMemberForm').reset();
+          fetchMembers();
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error adding member:', error);
+          Swal.fire({
+            icon: 'error',
+            title: 'เกิดข้อผิดพลาด',
+            text: 'ไม่สามารถเพิ่มสมาชิกได้'
+          });
+        })
+        .addMember(newMember);
+    }
+
+    // ฟังก์ชันอัพเดทข้อมูลทั้งหมด
+    function updateAllMembers() {
+      // รวบรวมข้อมูลทั้งหมดที่แก้ไข
+      const tableBody = document.getElementById('membersTableBody');
+      const rows = tableBody.querySelectorAll('tr');
+      let updates = [];
+
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('span[data-key]');
+        let member = {
+          idkey: '',
+          UserID: '', // เนื่องจาก UserID แสดงเป็นลิงก์ เราจึงไม่สามารถแก้ไขได้โดยตรงผ่านตาราง
+          ชื่อพนักงาน: '',
+          เบอร์โทร: '',
+          ยอมรับบันทึก: ''
+        };
+
+        cells.forEach(cell => {
+          const key = cell.getAttribute('data-key');
+          const field = cell.getAttribute('data-field');
+          let value = cell.textContent.trim();
+
+          // สำหรับฟิลด์ 'ยอมรับบันทึก' ให้แปลงค่าเป็น TRUE/FALSE
+          if (field === 'ยอมรับบันทึก') {
+            value = value.toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
+          }
+
+          member.idkey = key; // ทุกเซลล์ในแถวนี้จะมี key เดียวกัน
+          member[field] = value;
+        });
+
+        updates.push(member);
+      });
+
+      // ส่งข้อมูลไปยัง Server-Side เพื่ออัพเดท
+      google.script.run
+        .withSuccessHandler(function(response) {
+          Swal.fire({
+            icon: 'success',
+            title: 'สำเร็จ!',
+            text: response,
+            timer: 1500,
+            showConfirmButton: false
+          });
+          fetchMembers();
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error updating members:', error);
+          Swal.fire({
+            icon: 'error',
+            title: 'เกิดข้อผิดพลาด',
+            text: error.message || 'ไม่สามารถอัพเดทข้อมูลได้'
+          });
+          fetchMembers(); // รีเฟรชตารางเพื่อกลับค่าเดิม
+        })
+        .updateAllMembers(updates);
+    }
+
+    // ฟังก์ชันลบสมาชิก
+    function deleteMember(idkey) {
+      Swal.fire({
+        title: 'คุณแน่ใจไหม?',
+        text: "คุณต้องการลบสมาชิกนี้หรือไม่!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ใช่, ลบมัน!',
+        cancelButtonText: 'ไม่, ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          google.script.run
+            .withSuccessHandler(function(response) {
+              Swal.fire({
+                icon: 'success',
+                title: 'สำเร็จ!',
+                text: response,
+                timer: 1500,
+                showConfirmButton: false
+              });
+              fetchMembers();
+            })
+            .withFailureHandler(function(error) {
+              console.error('Error deleting member:', error);
+              Swal.fire({
+                icon: 'error',
+                title: 'เกิดข้อผิดพลาด',
+                text: 'ไม่สามารถลบสมาชิกได้'
+              });
+            })
+            .deleteMember(idkey);
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>
