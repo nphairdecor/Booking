@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ข้อมูลการนัดหมายและข้อมูลสมาชิก</title>
+  <!-- นำเข้า Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- นำเข้า SweetAlert2 สำหรับแสดงกล่องข้อความ -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- นำเข้า LIFF SDK ของ LINE -->
+  <script src="https://static.line-scdn.net/liff/edge/2.1/liff.js"></script>
+  <style>
+    .loader {
+      border-top-color: #1e293b;
+      animation: spin 1s linear infinite;
+      border: 8px solid #fdefff;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* สไตล์สำหรับ overlay การโหลดข้อมูลสมาชิก */
+    #memberLoadingOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(30, 41, 59, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.2rem;
+      display: none; /* ซ่อนเริ่มต้น */
+      z-index: 10;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-100 min-h-screen">
+  <!-- Main Content Area -->
+  <main class="max-w-5xl mx-auto p-4 relative">
+    <!-- Member Information Section: ส่วนแสดงข้อมูลสมาชิก -->
+    <div class="bg-white relative p-6 shadow-xl rounded-lg mb-6">
+      <div id="memberLoadingOverlay">
+        <div class="flex flex-col items-center">
+          <div class="loader mb-4"></div>
+          <span>กำลังโหลดข้อมูลสมาชิก...</span>
+        </div>
+      </div>
+      <div class="flex items-center mb-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-700">ชื่อ</label>
+          <input type="text" class="input-field bg-slate-50 text-gray-900 text-md font-bold bg-opacity-0 mb-2 w-full"
+            id="memberName" placeholder="ชื่อ" name="memberName" readonly>
+          <label class="block text-xs font-medium text-gray-700">เบอร์ติดต่อ</label>
+          <input type="text" class="input-field text-gray-900 text-md bg-white bg-opacity-0 mb-2 w-full"
+            id="memberPhone" placeholder="เบอร์ติดต่อ" name="memberPhone" readonly>
+          <input type="hidden" id="useridlineFilter">
+          <input type="hidden" id="columnAData" name="columnAData">
+        
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter Section: ส่วนสำหรับเลือกกรองข้อมูลการนัดหมาย -->
+    <div class="flex flex-wrap gap-4 mb-4">
+      <div class="flex-1 min-w-[200px]">
+        <label for="statusFilter" class="block text-xs font-medium text-gray-700">ค้นหาตามสถานะ</label>
+        <select id="statusFilter" class="mt-1 block w-full p-2 border border-gray-300 rounded-2xl">
+          <option value="">ทั้งหมด</option>
+          <option value="รอการยืนยัน">รอการยืนยัน</option>
+          <option value="ยืนยันแล้ว">ยืนยันแล้ว</option>
+          <option value="ยกเลิก">ยกเลิก</option>
+          <option value="เสร็จสิ้น">เสร็จสิ้น</option>
+        </select>
+      </div>
+      <div class="flex-1 min-w-[200px]">
+        <label for="dateSort" class="block text-xs font-medium text-gray-700">เรียงตามวันที่</label>
+        <select id="dateSort" class="mt-1 block w-full p-2 border border-gray-300 rounded-2xl">
+          <option value="latest">วันที่ล่าสุด</option>
+          <option value="oldest">วันที่เก่าสุด</option>
+        </select>
+      </div>
+      <div class="flex items-end">
+        <button id="applyFiltersButton"
+          class="w-full px-4 py-2 bg-slate-800 text-white rounded-2xl hover:bg-slate-700">กรองข้อมูล</button>
+      </div>
+    </div>
+
+    <!-- Table Display Section: ส่วนแสดงข้อมูลการนัดหมายในตาราง -->
+    <div class="overflow-x-auto">
+      <table class="min-w-full bg-white rounded-2xl shadow-md">
+        <thead>
+          <tr>
+            <th class="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">วันที่</th>
+            <th class="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">บริการ</th>
+            <th class="px-4 py-2 border-b text-left text-sm font-medium text-gray-700">สถานะ</th>
+            <th class="px-4 py-2 border-b text-center text-sm font-medium text-gray-700">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="filteredData">
+          <!-- จะเพิ่มแถวข้อมูลที่นี่ -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination Controls: ปุ่มสำหรับการควบคุมการเปลี่ยนหน้า -->
+    <div id="paginationControls" class="mt-6 flex justify-center space-x-2">
+      <!-- ปุ่มสำหรับควบคุมการเปลี่ยนหน้าจะถูกเพิ่มที่นี่ -->
+    </div>
+  </main>
+
+  <!-- Loading Spinner: ส่วนแสดงตัวโหลดระหว่างรอข้อมูลการนัดหมาย -->
+  <div id="loadingSpinner" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center hidden z-20">
+    <div class="loader"></div>
+  </div>
+
+  <script>
+    const DETAILS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzRpvQURfJ1RGwe5osNaEHuVca0SOD5MK9AZU9GWMd8xtMwVDE6yO7rzJn4GrUcHH8Z/exec'; // appscript L Booking
+    const WEB_MEMBER_APP_URL = 'https://script.google.com/macros/s/AKfycbzuNB1Z6RJlsa0wRdRVRfENN2JGQPn0W31fGpMCFjtbybHUKm4aCJ_SGA5EoXJLNvYu/exec'; // appscript L Member
+    const LIFF_ID = '2006671390-7GJ5yz0A';  // Liff id
+
+    const CARDS_PER_PAGE = 5;
+    let currentPage = 1;
+    let totalPages = 1;
+    let allFilteredDetails = [];
+
+    async function initializeLiff() {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        if (liff.isLoggedIn()) {
+          getUserProfile();
+        } else {
+          liff.login();
+        }
+      } catch (error) {
+        console.error('Error initializing LIFF:', error);
+      }
+    }
+
+    async function getUserProfile() {
+      try {
+        const profile = await liff.getProfile();
+        const userId = profile.userId;
+        document.getElementById('useridlineFilter').value = userId;
+        // แสดงชื่อ displayName ของผู้ใช้เป็นข้อมูลเริ่มต้น
+        document.getElementById('memberName').value = profile.displayName;
+
+        // แสดงตัวโหลดทั้งสอง
+        showMemberLoading(true);
+        showLoadingSpinner(true);
+
+        // เรียกใช้ fetchMemberData และ fetchAndPopulateTable พร้อมกัน
+        await Promise.all([
+          fetchMemberData(userId),
+          fetchAndPopulateTable()
+        ]);
+      } catch (error) {
+        console.error('Error getting profile data:', error);
+      } finally {
+        // ซ่อนตัวโหลดเมื่อทั้งสองเสร็จสิ้น
+        showMemberLoading(false);
+        showLoadingSpinner(false);
+      }
+    }
+
+    async function fetchMemberData(userId) {
+      showMemberLoading(true);
+      try {
+        // ใช้ GET request กับพารามิเตอร์เพื่อหลีกเลี่ยงปัญหา CORS
+        const response = await fetch(`${WEB_MEMBER_APP_URL}?action=fetchData&userId=${encodeURIComponent(userId)}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        // ตรวจสอบว่ามีข้อมูลสมาชิกหรือไม่
+        if (data && Object.keys(data).length > 0) {
+          displayMemberData(data);
+        } else {
+          console.log('No member data found for userId:', userId);
+          document.getElementById('memberName').value = '';
+          document.getElementById('memberPhone').value = '';
+        }
+      } catch (error) {
+        console.error('Error fetching member data:', error);
+      } finally {
+        showMemberLoading(false);
+      }
+    }
+
+    function displayMemberData(row) {
+
+      document.getElementById('memberName').value = row.nameId || '';
+      document.getElementById('memberPhone').value = row.keynumberId || '';
+ 
+    }
+
+    function showMemberLoading(isLoading) {
+      const overlay = document.getElementById('memberLoadingOverlay');
+      const inputs = document.querySelectorAll('#memberName, #memberPhone, #memberProfileImage');
+      if (isLoading) {
+        overlay.style.display = 'flex';
+        inputs.forEach(input => input.disabled = true);
+      } else {
+        overlay.style.display = 'none';
+        inputs.forEach(input => input.disabled = false);
+      }
+    }
+
+    function applyFilter() {
+      currentPage = 1;
+      fetchAndPopulateTable();
+    }
+
+    async function fetchAndPopulateTable() {
+      showLoadingSpinner(true);
+      try {
+        const response = await fetch(`${DETAILS_SCRIPT_URL}?action=fetchBookings`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const details = await response.json();
+
+        // สมมติว่า 'details' เป็น array ของ object การนัดหมาย
+        // ตรวจสอบและแปลงวันที่
+        details.forEach(detail => {
+          const [day, month, year] = detail.date.split('-');
+          detail.parsedDate = new Date(`${year}-${month}-${day}`);
+        });
+
+        // เรียงข้อมูลตามวันที่
+        const dateSort = document.getElementById('dateSort').value;
+        details.sort((a, b) => {
+          return dateSort === 'latest' ? b.parsedDate - a.parsedDate : a.parsedDate - b.parsedDate;
+        });
+
+        // กรองข้อมูลตามสถานะและ userId
+        const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
+        const useridlineFilter = document.getElementById('useridlineFilter').value.toLowerCase();
+
+        allFilteredDetails = details.filter(detail => {
+          const matchesStatus = statusFilter === '' || (detail.status && detail.status.toLowerCase().includes(statusFilter));
+          const matchesUseridline = useridlineFilter === '' || (detail.userlineid && detail.userlineid.toLowerCase().includes(useridlineFilter));
+          return matchesStatus && matchesUseridline;
+        });
+
+        totalPages = Math.ceil(allFilteredDetails.length / CARDS_PER_PAGE);
+        displayTable(allFilteredDetails, currentPage);
+        createPaginationControls();
+      } catch (error) {
+        console.error('Error fetching appointment details:', error);
+        Swal.fire('ข้อผิดพลาด!', 'เกิดข้อผิดพลาดในการดึงข้อมูลการนัดหมาย.', 'error');
+      } finally {
+        showLoadingSpinner(false);
+      }
+    }
+
+    function displayTable(details, page) {
+      const tbody = document.getElementById('filteredData');
+      tbody.innerHTML = '';
+
+      const startIndex = (page - 1) * CARDS_PER_PAGE;
+      const endIndex = startIndex + CARDS_PER_PAGE;
+      const detailsToDisplay = details.slice(startIndex, endIndex);
+
+      detailsToDisplay.forEach(detail => {
+        let disableConfirm = false;
+        let disableCancel = false;
+
+        switch (detail.status) {
+          case 'รอการยืนยัน':
+            break;
+          case 'ยืนยันแล้ว':
+            disableConfirm = true;
+            break;
+          case 'ยกเลิก':
+          case 'เสร็จสิ้น':
+            disableCancel = true;
+            disableConfirm = true;
+            break;
+        }
+
+        const tr = document.createElement('tr');
+        tr.classList.add('hover:bg-gray-100');
+
+        tr.innerHTML = `
+          <td class="px-4 py-2 border-b text-sm text-gray-700">${detail.date}</td>
+          <td class="px-4 py-2 border-b text-sm text-gray-700">${detail.service}</td>
+          <td class="px-4 py-2 border-b text-sm text-gray-700">${detail.status}</td>
+          <td class="px-4 py-2 border-b text-center space-x-2">
+            <button class="view-btn bg-blue-500 text-white px-3 py-1 rounded-xl text-sm" data-id="${detail.idKey}">ดูข้อมูล</button>
+            <button class="confirm-btn bg-green-500 text-white px-3 py-1 rounded-xl text-sm ${disableConfirm ? 'opacity-50 cursor-not-allowed' : ''}" ${disableConfirm ? 'disabled' : ''} data-id="${detail.idKey}">ยืนยัน</button>
+            <button class="cancel-btn bg-red-500 text-white px-3 py-1 rounded-xl text-sm ${disableCancel ? 'opacity-50 cursor-not-allowed' : ''}" ${disableCancel ? 'disabled' : ''} data-id="${detail.idKey}">ยกเลิก</button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      attachEventListeners();
+    }
+
+    function createPaginationControls() {
+      const paginationControls = document.getElementById('paginationControls');
+      paginationControls.innerHTML = '';
+
+      if (totalPages <= 1) return;
+
+      const maxVisibleButtons = 5;
+      let startPage = Math.max(1, currentPage - Math.floor(maxVisibleButtons / 2));
+      let endPage = startPage + maxVisibleButtons - 1;
+
+      if (endPage > totalPages) {
+        endPage = totalPages;
+        startPage = Math.max(1, endPage - maxVisibleButtons + 1);
+      }
+
+      // สร้างปุ่ม "ย้อนกลับ"
+      const prevButton = document.createElement('button');
+      prevButton.textContent = '«';
+      prevButton.disabled = currentPage === 1;
+      prevButton.classList.add('px-3', 'py-1', 'bg-slate-800', 'text-white', 'rounded-xl', 'hover:bg-slate-600', 'disabled:opacity-50');
+      prevButton.addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          displayTable(allFilteredDetails, currentPage);
+          createPaginationControls();
+        }
+      });
+      paginationControls.appendChild(prevButton);
+
+      // สร้างปุ่มสำหรับหน้าต่างๆ
+      for (let i = startPage; i <= endPage; i++) {
+        const pageButton = document.createElement('button');
+        pageButton.textContent = i;
+        pageButton.classList.add('px-3', 'py-1', 'bg-slate-800', 'text-white', 'rounded-xl', 'hover:bg-slate-600');
+        if (i === currentPage) {
+          pageButton.classList.add('bg-slate-600');
+        }
+        pageButton.addEventListener('click', () => {
+          currentPage = i;
+          displayTable(allFilteredDetails, currentPage);
+          createPaginationControls();
+        });
+        paginationControls.appendChild(pageButton);
+      }
+
+      // สร้างปุ่ม "ถัดไป"
+      const nextButton = document.createElement('button');
+      nextButton.textContent = '»';
+      nextButton.disabled = currentPage === totalPages;
+      nextButton.classList.add('px-3', 'py-1', 'bg-slate-800', 'text-white', 'rounded-xl', 'hover:bg-slate-600', 'disabled:opacity-50');
+      nextButton.addEventListener('click', () => {
+        if (currentPage < totalPages) {
+          currentPage++;
+          displayTable(allFilteredDetails, currentPage);
+          createPaginationControls();
+        }
+      });
+      paginationControls.appendChild(nextButton);
+    }
+
+    function attachEventListeners() {
+      document.querySelectorAll('.confirm-btn').forEach(button => {
+        button.addEventListener('click', function () {
+          const id = this.dataset.id;
+          confirmBooking(id);
+        });
+      });
+
+      document.querySelectorAll('.cancel-btn').forEach(button => {
+        button.addEventListener('click', function () {
+          const id = this.dataset.id;
+          cancelBooking(id);
+        });
+      });
+
+      document.querySelectorAll('.view-btn').forEach(button => {
+        button.addEventListener('click', function () {
+          const id = this.dataset.id;
+          viewDetails(id);
+        });
+      });
+    }
+
+    function confirmBooking(id) {
+      Swal.fire({
+        title: 'คุณแน่ใจหรือไม่?',
+        text: "คุณต้องการยืนยันการนัดหมายนี้หรือไม่!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'ใช่, ยืนยันเลย!',
+        cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          showLoadingSpinner(true);
+          fetch(`${DETAILS_SCRIPT_URL}?action=confirmBooking&id=${encodeURIComponent(id)}`, { method: 'POST' })
+            .then(response => response.text())
+            .then(data => {
+              showLoadingSpinner(false);
+              Swal.fire('ยืนยันแล้ว!', 'การจองได้รับการยืนยันแล้ว.', 'success');
+              fetchAndPopulateTable();
+            })
+            .catch(error => {
+              showLoadingSpinner(false);
+              Swal.fire('ข้อผิดพลาด!', 'เกิดข้อผิดพลาดในการยืนยันการนัดหมาย.', 'error');
+              console.error('Error confirming booking:', error);
+            });
+        }
+      });
+    }
+
+    function cancelBooking(id) {
+      Swal.fire({
+        title: 'คุณแน่ใจหรือไม่?',
+        text: "คุณต้องการยกเลิกการนัดหมายนี้หรือไม่!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'ใช่, ยกเลิกเลย!',
+        cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          showLoadingSpinner(true);
+          fetch(`${DETAILS_SCRIPT_URL}?action=cancelBooking&id=${encodeURIComponent(id)}`, { method: 'POST' })
+            .then(response => response.text())
+            .then(data => {
+              showLoadingSpinner(false);
+              Swal.fire('ยกเลิกแล้ว!', 'การนัดหมายถูกยกเลิกแล้ว.', 'success');
+              fetchAndPopulateTable();
+            })
+            .catch(error => {
+              showLoadingSpinner(false);
+              Swal.fire('ข้อผิดพลาด!', 'เกิดข้อผิดพลาดในการยกเลิกการนัดหมาย.', 'error');
+              console.error('Error canceling booking:', error);
+            });
+        }
+      });
+    }
+
+    function viewDetails(id) {
+      const detail = allFilteredDetails.find(item => item.idKey === id);
+      if (detail) {
+        Swal.fire({
+          title: 'รายละเอียดการนัดหมาย',
+          html: `
+            <p><strong>ชื่อ:</strong> ${detail.name || 'ไม่ระบุ'}</p>
+            <p><strong>เบอร์โทร:</strong> ${detail.phonenumber || 'ไม่ระบุ'}</p>
+            <p><strong>บริการ:</strong> ${detail.service || 'ไม่ระบุ'}</p>
+            <p><strong>วันที่:</strong> ${detail.date || 'ไม่ระบุ'}</p>
+            <p><strong>เวลา:</strong> ${detail.time || 'ไม่ระบุ'}</p>
+            <p><strong>สถานที่:</strong> ${detail.locationservice || 'ไม่ระบุ'}</p>
+            <p><strong>หมายเหตุ:</strong> ${detail.note || 'ไม่ระบุ'}</p>
+            <p><strong>สถานะ:</strong> ${detail.status || 'ไม่ระบุ'}</p>
+          `,
+          icon: 'info',
+          confirmButtonText: 'ปิด'
+        });
+      } else {
+        Swal.fire('ข้อผิดพลาด!', 'ไม่พบรายละเอียดการนัดหมายที่ต้องการ.', 'error');
+      }
+    }
+
+    function showLoadingSpinner(show) {
+      const spinner = document.getElementById('loadingSpinner');
+      if (show) {
+        spinner.classList.remove('hidden');
+      } else {
+        spinner.classList.add('hidden');
+      }
+    }
+
+    document.getElementById('applyFiltersButton').addEventListener('click', function () {
+      applyFilter();
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+      initializeLiff();
+    });
+  </script>
+</body>
+
+</html>
