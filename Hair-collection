@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ตัวอย่างคลิกที่รูปเล็กเพื่อแสดงรูปใหญ่ - Apps Script</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        /* กำหนดขนาดและสไตล์สำหรับรูปใหญ่ */
+        #mainImage {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* ให้รูปขยายแบบคงสัดส่วน */
+        }
+
+        /* สำหรับรูปย่อ (thumbnail) */
+        .thumb {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            cursor: pointer;
+            border-radius: 0.5rem;
+            border: 2px solid #f5f5f5;
+            transition: transform 0.2s;
+        }
+
+        .thumb:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body class="bg-white min-h-screen p-8 flex flex-col items-center">
+    <h1 class="text-2xl font-bold mb-6">แสดงรูปภาพ</h1>
+
+    <!-- กรอบรูปใหญ่ -->
+    <div id="mainImageContainer"
+        class="w-80 h-80 bg-gray-200 flex items-center justify-center mb-6 rounded-xl overflow-hidden">
+        <!-- mainImage จะถูกแสดง/ซ่อนตามสถานะ -->
+        <img id="mainImage" src="" alt="รูปหลัก" class="w-full h-full object-cover hidden" />
+        <!-- ข้อความ placeholder ถ้าไม่มีรูป -->
+        <span id="placeholderText" class="text-gray-500">
+            ไม่มีรูปภาพ
+        </span>
+    </div>
+
+    <!-- แถวรูปย่อ (thumbnails) -->
+    <div id="thumbnailContainer" class="flex flex-wrap gap-4 justify-center">
+        <!-- รูปย่อจะถูกสร้างด้วย JavaScript -->
+    </div>
+
+    <script>
+        // URL ของ Apps Script Web App (คืนค่า JSON [{fileName, dataUrl}, ...])
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwiGPwZtah3-VSE3nrrZ26b16y0y4hd8qvHrhOrN_Dn91GDzIAUUZ5b5g9txYs7hoeQ4Q/exec";
+
+        // ตัวแปรเก็บข้อมูลรูป
+        let imageDataList = [];
+
+        // โหลดข้อมูลรูปทันทีที่หน้าเว็บพร้อม
+        window.addEventListener("DOMContentLoaded", async () => {
+            // แสดง SweetAlert ขณะกำลังโหลด
+            Swal.fire({
+                title: 'Loading...',
+                text: 'กำลังโหลดข้อมูลรูปภาพ...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            try {
+                const response = await fetch(APPS_SCRIPT_URL);
+                if (!response.ok) {
+                    throw new Error("เกิดข้อผิดพลาด: " + response.status);
+                }
+
+                // data = [{fileName, dataUrl}, ...]
+                imageDataList = await response.json();
+                // ปิด SweetAlert
+                Swal.close();
+
+                // ถ้ามีรูป อย่างน้อย 1 รูป ก็โชว์รูปแรก
+                if (imageDataList.length > 0) {
+                    showMainImage(0);
+                }
+                // สร้างรูปย่อ
+                renderThumbnails();
+            } catch (error) {
+                console.error(error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: error.message
+                });
+            }
+        });
+
+        // ฟังก์ชันแสดงรูปหลักตาม index
+        function showMainImage(index) {
+            const mainImage = document.getElementById("mainImage");
+            const placeholder = document.getElementById("placeholderText");
+
+            if (imageDataList.length === 0) {
+                // ไม่มีรูป
+                mainImage.classList.add("hidden");
+                placeholder.classList.remove("hidden");
+                placeholder.textContent = "ไม่มีรูปภาพ";
+                return;
+            }
+
+            // ซ่อน placeholder
+            placeholder.classList.add("hidden");
+            // แสดงรูป
+            const { fileName, dataUrl } = imageDataList[index];
+            mainImage.src = dataUrl;
+            mainImage.alt = fileName;
+            mainImage.classList.remove("hidden");
+        }
+
+        // ฟังก์ชันสร้าง thumbnails
+        function renderThumbnails() {
+            const container = document.getElementById("thumbnailContainer");
+            container.innerHTML = "";
+
+            imageDataList.forEach((imgObj, index) => {
+                const thumb = document.createElement("img");
+                thumb.src = imgObj.dataUrl;
+                thumb.alt = imgObj.fileName;
+                thumb.className = "thumb";
+
+                // เมื่อคลิก -> แสดงรูปหลัก index นั้น
+                thumb.addEventListener("click", () => {
+                    showMainImage(index);
+                });
+
+                container.appendChild(thumb);
+            });
+        }
+    </script>
+</body>
+
+</html>
