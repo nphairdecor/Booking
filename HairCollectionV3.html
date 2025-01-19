@@ -1,8 +1,5 @@
 <!DOCTYPE html>
 <html lang="th">
-<p align="center" ><img src="https://lh5.googleusercontent.com/d/1CgczWwOL7XYpRyqy8TYfhD7yJ1-BfKId"width="200" height="200"></p>
- 
-
 <head>
  <meta charset="UTF-8">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -48,12 +45,17 @@
     </style>
 </head>
 
-<body class="bg-stone-100 min-h-screen p-8 flex flex-col items-center">
-    <h1 class="text-2xl font-bold text-stone-800 mb-6">แบบทรงผม</h1>
+<body class="bg-stone-100 min-h-screen p-8 flex flex-col items-center rounded-xl">
+    <p align="center" ><img src="https://lh5.googleusercontent.com/d/1CgczWwOL7XYpRyqy8TYfhD7yJ1-BfKId"width="200" height="200"></p>
+    <div class="w-full max-w-md mx-auto text-center">
+    <div class="bg-gradient-to-r from-stone-900 to-stone-300 text-white items-center rounded-xl p-10">
+    <h1 class="text-2xl font-bold">Hair Collection</h1>
+    </div>
+    <h1 class="text-xl font-bold text-stone-800 m-6">แบบทรงผม</h1>
 
     <!-- กรอบรูปใหญ่ -->
     <div id="mainImageContainer"
-        class="w-80 h-80 bg-gray-200 flex items-center justify-center mb-6 rounded-xl overflow-hidden">
+        class="w-full  bg-gray-200 flex items-center justify-center mb-6 rounded-xl overflow-hidden">
         <!-- mainImage จะถูกแสดง/ซ่อนตามสถานะ -->
         <img id="mainImage" src="" alt="รูปหลัก" class="w-full h-full object-cover hidden" />
         <!-- ข้อความ placeholder ถ้าไม่มีรูป -->
@@ -66,7 +68,7 @@
     <div id="thumbnailContainer" class="flex flex-wrap gap-4 justify-center">
         <!-- รูปย่อจะถูกสร้างด้วย JavaScript -->
     </div>
-
+</div>
     <script>
         // URL ของ Apps Script Web App (คืนค่า JSON [{fileName, fileUrl}, ...])
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzvbCrUFY-lPHg8E9sOFyqwTrBvQeySRfx8sRRclDSs3Z34MZ8wc8s2vJ7bf01zbKc/exec";
